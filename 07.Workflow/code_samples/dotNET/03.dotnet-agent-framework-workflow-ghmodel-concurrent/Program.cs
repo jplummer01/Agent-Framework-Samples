@@ -5,7 +5,6 @@ using OpenAI;
 using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Agents.AI.Workflows.Reflection;
 using DotNetEnv;
 
 // Load environment variables
@@ -31,10 +30,17 @@ const string PlanAgentName = "Plan-Agent";
 const string PlanAgentInstructions = "You are my travel planner, working with me to create a detailed travel plan based on the researcher's findings.";
 
 // Create AI agents
-AIAgent researcherAgent = openAIClient.GetChatClient(github_model_id).AsIChatClient().AsAIAgent(
-    name: ResearcherAgentName, instructions: ResearcherAgentInstructions);
-AIAgent plannerAgent = openAIClient.GetChatClient(github_model_id).AsIChatClient().AsAIAgent(
-    name: PlanAgentName, instructions: PlanAgentInstructions);
+var chatClient = openAIClient.GetChatClient(github_model_id).AsIChatClient();
+
+ChatClientAgent researcherAgent = new(
+    chatClient,
+    name: ResearcherAgentName,
+    instructions: ResearcherAgentInstructions);
+
+ChatClientAgent plannerAgent = new(
+    chatClient,
+    name: PlanAgentName,
+    instructions: PlanAgentInstructions);
 
 // Create concurrent executors
 var startExecutor = new ConcurrentStartExecutor();
@@ -42,25 +48,26 @@ var aggregationExecutor = new ConcurrentAggregationExecutor();
 
 // Build concurrent workflow with FanOut/FanIn pattern
 var workflow = new WorkflowBuilder(startExecutor)
-            .AddFanOutEdge(startExecutor, targets: [researcherAgent, plannerAgent])
-            .AddFanInEdge(sources: [researcherAgent, plannerAgent], aggregationExecutor)
+            .AddFanOutEdge(startExecutor, [researcherAgent, plannerAgent])
+            .AddFanInBarrierEdge([researcherAgent, plannerAgent], aggregationExecutor)
             .WithOutputFrom(aggregationExecutor)
             .Build();
 
-string messageData = "";
 // Execute workflow
-StreamingRun run = await InProcessExecution.StreamAsync(workflow, "Plan a trip to Seattle in December");
-await foreach (WorkflowEvent evt in run.WatchStreamAsync().ConfigureAwait(false))
+await using StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, input: "Plan a trip to Seattle in December");
+
+string messageData = "";
+await foreach (WorkflowEvent evt in run.WatchStreamAsync())
 {
-    if (evt is AgentResponseUpdateEvent executorComplete)
+    if (evt is WorkflowOutputEvent output)
     {
-        messageData += executorComplete.Data;
-        Console.WriteLine($"{executorComplete.ExecutorId}: {executorComplete.Data}");
+        messageData = output.Data?.ToString() ?? "";
+        Console.WriteLine($"Workflow completed with results:\n{output.Data}");
     }
 }
 
+Console.WriteLine("\n=== Final Output ===");
 Console.WriteLine(messageData);
-
 
 // Mermaid
 Console.WriteLine("\nMermaid string: \n=======");
@@ -79,51 +86,36 @@ Console.WriteLine("                   dot -Tpng workflow.dot -o workflow.png");
 /// <summary>
 /// Executor that starts the concurrent processing by broadcasting messages to all agents.
 /// </summary>
-public class ConcurrentStartExecutor() :
-    ReflectingExecutor<ConcurrentStartExecutor>("ConcurrentStartExecutor"),
-    IMessageHandler<string>
+internal sealed partial class ConcurrentStartExecutor() :
+    Executor("ConcurrentStartExecutor")
 {
-    /// <summary>
-    /// Starts the concurrent processing by sending messages to the agents.
-    /// </summary>
-    /// <param name="message">The user message to process</param>
-    /// <param name="context">Workflow context for accessing workflow services and adding events</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>A task representing the asynchronous operation</returns>
+    [MessageHandler]
     public async ValueTask HandleAsync(string message, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         // Broadcast the message to all connected agents. Receiving agents will queue
         // the message but will not start processing until they receive a turn token.
-        await context.SendMessageAsync(new ChatMessage(ChatRole.User, message));
+        await context.SendMessageAsync(new ChatMessage(ChatRole.User, message), cancellationToken: cancellationToken);
         // Broadcast the turn token to kick off the agents.
-        await context.SendMessageAsync(new TurnToken(emitEvents: true));
+        await context.SendMessageAsync(new TurnToken(emitEvents: true), cancellationToken: cancellationToken);
     }
 }
 
 /// <summary>
 /// Executor that aggregates the results from the concurrent agents.
 /// </summary>
-public class ConcurrentAggregationExecutor() :
-    ReflectingExecutor<ConcurrentAggregationExecutor>("ConcurrentAggregationExecutor"),
-    IMessageHandler<ChatMessage>
+internal sealed class ConcurrentAggregationExecutor() :
+    Executor<List<ChatMessage>>("ConcurrentAggregationExecutor")
 {
     private readonly List<ChatMessage> _messages = [];
 
-    /// <summary>
-    /// Handles incoming messages from the agents and aggregates their responses.
-    /// </summary>
-    /// <param name="message">The message from the agent</param>
-    /// <param name="context">Workflow context for accessing workflow services and adding events</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    public async ValueTask HandleAsync(ChatMessage message, IWorkflowContext context, CancellationToken cancellationToken = default)
+    public override async ValueTask HandleAsync(List<ChatMessage> message, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
-        this._messages.Add(message);
+        this._messages.AddRange(message);
 
         if (this._messages.Count == 2)
         {
             var formattedMessages = string.Join(Environment.NewLine, this._messages.Select(m => $"{m.AuthorName}: {m.Text}"));
-            await context.YieldOutputAsync(formattedMessages);
+            await context.YieldOutputAsync(formattedMessages, cancellationToken);
         }
     }
 }

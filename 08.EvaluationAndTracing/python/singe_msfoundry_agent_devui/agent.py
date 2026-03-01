@@ -9,7 +9,7 @@ import asyncio
 import os
 from typing import Annotated
 
-from agent_framework import ChatAgent
+from agent_framework import Agent
 from agent_framework.azure import AzureAIProjectAgentProvider
 from azure.identity.aio import AzureCliCredential
 from pydantic import Field

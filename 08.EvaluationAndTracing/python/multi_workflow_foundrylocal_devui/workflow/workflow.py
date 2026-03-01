@@ -10,13 +10,13 @@ from agent_framework import (
 	AgentExecutor,
 	AgentExecutorRequest,
 	AgentExecutorResponse,
-	ChatMessage,
+	Message,
 	Role,
-	ConcurrentBuilder,
 	WorkflowContext,
 	executor,
 )
 
+from agent_framework.orchestrations import ConcurrentBuilder
 from plan_agent import plan_agent
 from researcher_agent import researcher_agent
 
@@ -30,7 +30,7 @@ research_executor = AgentExecutor(researcher_agent, id="researcher_agent")  # ty
 
 # Assemble workflow: planner -> transform -> researcher -> output
 workflow = (
-	ConcurrentBuilder().participants([research_executor, planner_executor]).build()
+	ConcurrentBuilder(participants=[research_executor, planner_executor]).build()
 )
 
     

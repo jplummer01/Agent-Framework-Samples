@@ -11,7 +11,6 @@ using Azure.AI.Projects.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Agents.AI.Workflows.Reflection;
 using OpenAI.Assistants;
 using OpenAI.Responses;
 using DotNetEnv;
@@ -223,7 +222,7 @@ Console.WriteLine("Starting workflow...");
 
 // Execute workflow
 var chat = new ChatMessage(ChatRole.User, prompt);
-await using StreamingRun run = await InProcessExecution.StreamAsync(workflow, chat);
+await using StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, chat);
 
 // Process workflow events
 await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
@@ -275,7 +274,7 @@ public class ReviewResult
 }
 
 // Executor: Draft Creation
-public class DraftExecutor : ReflectingExecutor<DraftExecutor>, IMessageHandler<ChatMessage, ContentResult>
+public partial class DraftExecutor : Executor
 {
     private readonly AIAgent _evangelistAgent;
 
@@ -284,6 +283,7 @@ public class DraftExecutor : ReflectingExecutor<DraftExecutor>, IMessageHandler<
         this._evangelistAgent = evangelistAgent;
     }
 
+    [MessageHandler]
     public async ValueTask<ContentResult> HandleAsync(ChatMessage message, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"DraftExecutor .......loading \n" + message.Text);
@@ -299,7 +299,7 @@ public class DraftExecutor : ReflectingExecutor<DraftExecutor>, IMessageHandler<
 }
 
 // Executor: Content Review
-public class ContentReviewExecutor : ReflectingExecutor<ContentReviewExecutor>, IMessageHandler<ContentResult, ReviewResult>
+public partial class ContentReviewExecutor : Executor
 {
     private readonly AIAgent _contentReviewerAgent;
 
@@ -308,6 +308,7 @@ public class ContentReviewExecutor : ReflectingExecutor<ContentReviewExecutor>, 
         this._contentReviewerAgent = contentReviewerAgent;
     }
 
+    [MessageHandler]
     public async ValueTask<ReviewResult> HandleAsync(ContentResult content, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"ContentReviewExecutor .......loading");
@@ -321,7 +322,7 @@ public class ContentReviewExecutor : ReflectingExecutor<ContentReviewExecutor>, 
 }
 
 // Executor: Publishing
-public class PublishExecutor : ReflectingExecutor<PublishExecutor>, IMessageHandler<ReviewResult>
+public partial class PublishExecutor : Executor
 {
     private readonly AIAgent _publishAgent;
 
@@ -330,6 +331,7 @@ public class PublishExecutor : ReflectingExecutor<PublishExecutor>, IMessageHand
         this._publishAgent = publishAgent;
     }
 
+    [MessageHandler]
     public async ValueTask HandleAsync(ReviewResult review, IWorkflowContext context, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"PublishExecutor .......loading");
@@ -340,12 +342,13 @@ public class PublishExecutor : ReflectingExecutor<PublishExecutor>, IMessageHand
 }
 
 // Executor: Send Review Notification
-public class SendReviewExecutor : ReflectingExecutor<SendReviewExecutor>, IMessageHandler<ReviewResult>
+public partial class SendReviewExecutor : Executor
 {
     public SendReviewExecutor() : base("SendReviewExecutor")
     {
     }
 
+    [MessageHandler]
     public async ValueTask HandleAsync(ReviewResult message, IWorkflowContext context, CancellationToken cancellationToken = default) =>
         await context.YieldOutputAsync($"Draft content needs revision: {message.Reason}");
 }

@@ -3,9 +3,9 @@ digraph Workflow {
   node [shape=box, style=filled, fillcolor=lightblue];
   edge [color=black, arrowhead=vee];
 
-  "Sales_Agent_5ccef97d61a0481e949ef595eccc468f" [fillcolor=lightgreen, label="Sales_Agent_5ccef97d61a0481e949ef595eccc468f\n(Start)"];
-  "Price_Agent_c1076eeb08964228bcf38c621c1c9ff3" [label="Price_Agent_c1076eeb08964228bcf38c621c1c9ff3"];
-  "Quote_Agent_79fd7471e3764902a6deda87c809cbd2" [label="Quote_Agent_79fd7471e3764902a6deda87c809cbd2"];
-  "Sales_Agent_5ccef97d61a0481e949ef595eccc468f" -> "Price_Agent_c1076eeb08964228bcf38c621c1c9ff3";
-  "Price_Agent_c1076eeb08964228bcf38c621c1c9ff3" -> "Quote_Agent_79fd7471e3764902a6deda87c809cbd2";
+  "Sales_Agent_07af6ffb5d354518b5769bef5c81f90b" [fillcolor=lightgreen, label="Sales_Agent_07af6ffb5d354518b5769bef5c81f90b\n(Start)"];
+  "Price_Agent_b11815f3e35e4ca1a077763a00adf953" [label="Price_Agent_b11815f3e35e4ca1a077763a00adf953"];
+  "Quote_Agent_a227010b23654b398f80a60cbe9a5268" [label="Quote_Agent_a227010b23654b398f80a60cbe9a5268"];
+  "Sales_Agent_07af6ffb5d354518b5769bef5c81f90b" -> "Price_Agent_b11815f3e35e4ca1a077763a00adf953";
+  "Price_Agent_b11815f3e35e4ca1a077763a00adf953" -> "Quote_Agent_a227010b23654b398f80a60cbe9a5268";
 }

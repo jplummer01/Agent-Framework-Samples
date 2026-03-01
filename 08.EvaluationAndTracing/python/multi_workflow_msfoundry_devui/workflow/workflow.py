@@ -10,18 +10,16 @@ from agent_framework import (
     AgentExecutor,
     AgentExecutorRequest,
     AgentExecutorResponse,
-    ChatMessage,
-    HostedCodeInterpreterTool,
-    Role,
+    Message,
     WorkflowBuilder,
     WorkflowContext,
     executor,
 )
-from agent_framework.azure import AzureAIProjectAgentProvider
+from agent_framework.azure import AzureAIAgentClient, AzureAIAgentsProvider
 
-from evangelist_agent import EvangelistAgent, EVANGELIST_NAME, EVANGELIST_INSTRUCTIONS
+from evangelist_agent import EVANGELIST_NAME, EVANGELIST_INSTRUCTIONS
 from contentreview_agent import ReviewAgent, REVIEWER_NAME, REVIEWER_INSTRUCTIONS
-from publisher_agent import PublisherAgent, PUBLISHER_NAME, PUBLISHER_INSTRUCTIONS
+from publisher_agent import PUBLISHER_NAME, PUBLISHER_INSTRUCTIONS
 
 # Load environment variables
 load_dotenv()
@@ -33,20 +31,6 @@ class ReviewResult:
     review_result: str
     reason: str
     draft_content: str
-
-
-@executor(id="to_evangelist_content_result")
-async def to_evangelist_content_result(
-    response: AgentExecutorResponse, 
-    ctx: WorkflowContext[AgentExecutorRequest]
-) -> None:
-    """Convert evangelist agent response to structured format and forward to reviewer"""
-    response_text = response.agent_response.text.strip()
-    print(f"📝 [Workflow] Raw response from evangelist agent: {response_text}")
-    
-    parsed = EvangelistAgent.model_validate_json(response_text)
-    user_msg = ChatMessage(Role.USER, text=parsed.draft_content)
-    await ctx.send_message(AgentExecutorRequest(messages=[user_msg], should_respond=True))
 
 
 @executor(id="to_reviewer_result")
@@ -98,7 +82,7 @@ async def handle_review(review: ReviewResult, ctx: WorkflowContext[str]) -> None
     else:
         await ctx.send_message(
             AgentExecutorRequest(
-                messages=[ChatMessage(Role.USER, text=review.draft_content)], 
+                messages=[Message("user", text=review.draft_content)], 
                 should_respond=True
             )
         )
@@ -110,77 +94,84 @@ async def save_draft(review: ReviewResult, ctx: WorkflowContext[AgentExecutorReq
     # Only called for approved drafts by selection_func
     await ctx.send_message(
         AgentExecutorRequest(
-            messages=[ChatMessage(Role.USER, text=review.draft_content)], 
+            messages=[Message("user", text=review.draft_content)], 
             should_respond=True
         )
     )
 
 
-# Workflow creation function (matches notebook pattern)
-async def create_workflow():
-    """Create the conditional workflow with Azure AI Foundry agents"""
-    async with (
-        AzureCliCredential() as credential,
-        AzureAIProjectAgentProvider(
-            project_endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"], 
-            credential=credential
-        ) as client,
-    ):
-        # Create evangelist agent with Bing Search
-        evangelist_agent_obj = await client.create_agent(
-            name=EVANGELIST_NAME,
-            instructions=EVANGELIST_INSTRUCTIONS,
-            model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-            tools=[
-                {
-                    "type": "bing_grounding",
-                    "bing_grounding": {
-                        "search_configurations": [
-                            {
-                                "project_connection_id": os.environ["BING_CONNECTION_ID"],
-                            }
-                        ]
-                    },
-                }
-            ],
-            # response_format=EvangelistAgent
-        )
-        evangelist_executor = AgentExecutor(evangelist_agent_obj, id="evangelist_agent")
-        
-        # Create reviewer agent
-        reviewer_agent_obj = await client.create_agent(
-            name=REVIEWER_NAME,
-            instructions=REVIEWER_INSTRUCTIONS,
-            model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-            # response_format=ReviewAgent
-        )
-        reviewer_executor = AgentExecutor(reviewer_agent_obj, id="reviewer_agent")
-        
-        # Create publisher agent with Code Interpreter
-        publisher_agent_obj = await client.create_agent(
-            name=PUBLISHER_NAME,
-            instructions=PUBLISHER_INSTRUCTIONS,
-            model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-            tools=HostedCodeInterpreterTool()
-            # response_format=PublisherAgent
-        )
-        publisher_executor = AgentExecutor(publisher_agent_obj, id="publisher_agent")
+# Keep provider/credential alive — they must not be closed while DevUI serves.
+# main.py runs create_workflow() and uvicorn in a single asyncio.run(),
+# so the references here keep the HTTP sessions alive for the entire process.
+_credential = None
+_provider = None
+_client = None
 
-        # Build the conditional workflow
-        workflow = (
-            WorkflowBuilder()
-            .set_start_executor(evangelist_executor)
-            .add_edge(evangelist_executor, to_evangelist_content_result)
-            .add_edge(to_evangelist_content_result, reviewer_executor)
-            .add_edge(reviewer_executor, to_reviewer_result)
-            .add_multi_selection_edge_group(
-                to_reviewer_result,
-                [handle_review, save_draft],
-                selection_func=select_targets,
-            )
-            .add_edge(save_draft, publisher_executor)
-            .build()
+
+async def create_workflow():
+    """Create the conditional workflow with Azure AI Foundry agents.
+
+    The credential, provider, and client are stored as module globals so they
+    remain alive for the duration of the process. main.py ensures that
+    create_workflow() and uvicorn run in the same event loop.
+    """
+    global _credential, _provider, _client
+
+    _credential = AzureCliCredential()
+    _provider = AzureAIAgentsProvider(credential=_credential)
+    _client = AzureAIAgentClient(credential=_credential)
+    code_interpreter_tool = _client.get_code_interpreter_tool()
+
+    # Create evangelist agent with Bing Search
+    evangelist_agent_obj = await _provider.create_agent(
+        name=EVANGELIST_NAME,
+        instructions=EVANGELIST_INSTRUCTIONS,
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+        tools=[
+            {
+                "type": "bing_grounding",
+                "bing_grounding": {
+                    "search_configurations": [
+                        {
+                            "connection_id": os.environ["BING_CONNECTION_ID"],
+                        }
+                    ]
+                },
+            }
+        ],
+    )
+    evangelist_executor = AgentExecutor(evangelist_agent_obj, id="evangelist_agent")
+    
+    # Create reviewer agent
+    reviewer_agent_obj = await _provider.create_agent(
+        name=REVIEWER_NAME,
+        instructions=REVIEWER_INSTRUCTIONS,
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+    )
+    reviewer_executor = AgentExecutor(reviewer_agent_obj, id="reviewer_agent")
+    
+    # Create publisher agent with Code Interpreter
+    publisher_agent_obj = await _provider.create_agent(
+        name=PUBLISHER_NAME,
+        instructions=PUBLISHER_INSTRUCTIONS,
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+        tools=[code_interpreter_tool],
+    )
+    publisher_executor = AgentExecutor(publisher_agent_obj, id="publisher_agent")
+
+    # Build the conditional workflow
+    workflow = (
+        WorkflowBuilder(start_executor=evangelist_executor)
+        .add_edge(evangelist_executor, reviewer_executor)
+        .add_edge(reviewer_executor, to_reviewer_result)
+        .add_multi_selection_edge_group(
+            to_reviewer_result,
+            [handle_review, save_draft],
+            selection_func=select_targets,
         )
-        
-        return workflow
+        .add_edge(save_draft, publisher_executor)
+        .build()
+    )
+    
+    return workflow
 

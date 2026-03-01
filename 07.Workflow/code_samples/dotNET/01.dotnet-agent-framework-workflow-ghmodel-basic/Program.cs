@@ -59,7 +59,7 @@ ChatMessage userMessage = new ChatMessage(ChatRole.User, [
 ]);
 
 // Execute workflow
-StreamingRun run = await InProcessExecution.StreamAsync(workflow, userMessage);
+StreamingRun run = await InProcessExecution.RunStreamingAsync(workflow, userMessage);
 
 // Process workflow events
 await run.TrySendMessageAsync(new TurnToken(emitEvents: true));

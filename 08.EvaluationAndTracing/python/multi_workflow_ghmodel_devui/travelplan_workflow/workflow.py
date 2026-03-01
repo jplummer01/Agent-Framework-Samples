@@ -3,4 +3,4 @@ from frontdesk_agent import front_desk_agent  # 🧑‍💼 Front Desk Travel Ag
 from reviewer_agent import reviewer_agent  # 🧑‍💼 Reviewer Agent
 
 
-workflow = WorkflowBuilder().set_start_executor(front_desk_agent).add_edge(front_desk_agent, reviewer_agent).build()
+workflow = WorkflowBuilder(start_executor=front_desk_agent).add_edge(front_desk_agent, reviewer_agent).build()

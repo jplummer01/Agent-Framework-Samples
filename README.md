@@ -33,42 +33,44 @@ This repository provides step-by-step tutorials and real-world examples covering
 
 ## 🛠 Prerequisites
 
-***Note: This is installation guideline***
-
-> ⚠️ **Important Notice**: Microsoft Agent Framework(RC2) is currently in the **development/preview stage**. Since the framework APIs and features may change frequently, **we strongly recommend building from source** rather than using NuGet packages to ensure you have the latest updates and bug fixes.
+> ⚠️ **Important Notice**: Microsoft Agent Framework has officially released **v1.0** (2026-04-02). You can use either the **released version** or the **build-from-source version** to complete the examples, depending on your needs.
 
 > 📌 **Additional Notes**: 
 > 1. The examples in this repository are primarily based on **GitHub Models** and **Microsoft Foundry**. You can access GitHub Models directly at https://gh.io/models
 > 2. **Microsoft Foundry Agent Service** uses the **V2 version**. Please access it at https://ai.azure.com and select **V2** when creating or managing your Microsoft Foundry projects.
 
-### Python Environment
-- Python 3.10 or higher
-- Install dependencies: 
+### Option 1: Install Released Version
 
+**Python:**
+```bash
+pip install agent-framework --pre
+```
+
+**.NET:**
+```bash
+dotnet add package Microsoft.Agents.AI
+```
+
+### Option 2: Build from Source (Latest Features)
+
+If you want the latest features, we recommend building from source.
+
+**Python:**
 ```bash
 pip install -r ./Installation/requirement.txt -U
 ```
 
-**Build from Source (Recommended):**
-
+**.NET:**
 ```bash
 git clone https://github.com/microsoft/agent-framework.git
-cd agent-framework/python
-pip install -e .
+cd agent-framework/dotnet
+dotnet build agent-framework-dotnet.slnx
 ```
 
-### .NET Environment
-- .NET 9.0 or higher
-- Visual Studio 2022 or VS Code with C# extension
+### Environment Requirements
 
-**Build from Source (Recommended):**
-
-```bash
-git clone https://github.com/microsoft/agent-framework.git
-cd agent-framework/dotnet && dotnet build agent-framework-dotnet.slnx
-```
-
-After building, reference the local project in your notebooks or applications instead of NuGet packages. This ensures compatibility with the latest framework changes.
+- **Python**: 3.10 or higher
+- **.NET**: 9.0 or higher, Visual Studio 2022 or VS Code with C# extension
 
 
 ## 💻 Platform-Specific Setup

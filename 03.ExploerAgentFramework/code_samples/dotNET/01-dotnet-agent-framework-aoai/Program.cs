@@ -7,7 +7,7 @@ using DotNetEnv;
 Env.Load("../../../../.env");
 
 var aoai_endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT") ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT is not set.");
-var aoai_model_id = Environment.GetEnvironmentVariable("AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME") ?? "gpt-4.1-mini";
+var aoai_model_id = Environment.GetEnvironmentVariable("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME") ?? "gpt-4.1-mini";
 
 Console.WriteLine($"Using Azure OpenAI Endpoint: {aoai_endpoint}");
 Console.WriteLine($"Using Azure OpenAI Model Deployment: {aoai_model_id}");

@@ -2,7 +2,6 @@
 """Foundry-based weather agent for Agent Framework Debug UI.
 
 This agent uses Azure AI Foundry with Azure CLI authentication.
-Make sure to run 'az login' before starting devui.
 """
 
 import asyncio
@@ -10,8 +9,8 @@ import os
 from typing import Annotated
 
 from agent_framework import Agent
-from agent_framework.azure import AzureAIProjectAgentProvider
-from azure.identity.aio import AzureCliCredential
+from agent_framework.foundry import FoundryChatClient
+from azure.identity import AzureCliCredential
 from pydantic import Field
 from dotenv import load_dotenv  # 📁 Secure configuration loading
 
@@ -45,47 +44,19 @@ def get_forecast(
 
 async def _foundry_setup():
     """Setup Foundry agent with hosted tools."""
-    async with (
-            AzureCliCredential() as credential,
-            AzureAIProjectAgentProvider(project_endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"], credential=credential) as client,
-        ):
-            agent = await client.create_agent(
-                model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"], 
-                instructions=""",
-                You are a weather assistant using Azure AI Foundry models. You can provide
-                current weather information and forecasts for any location. Always be helpful
-                and provide detailed weather information when asked.
-                """,
-                name="FoundryWeatherAgent",
-                tools=[get_weather, get_forecast],
-            )
-
-            return agent
-
-            # message = "Write a python function that returns a random even number between 1 and 100, and then call the function."
-
-            # first_result = await agent.run(message)
-                
-            # print(f"Agent: {first_result.text}")
-
-
-# Agent instance following Agent Framework conventions
-# agent = ChatAgent(
-#     name="FoundryWeatherAgent1",
-#     chat_client=AzureAIAgentClient(
-#         project_endpoint=os.environ.get("AZURE_AI_PROJECT_ENDPOINT"),
-#         model_deployment_name=os.environ.get("AZURE_AI_MODEL_DEPLOYMENT_NAME"),
-#         async_credential=AzureCliCredential(),
-#     ),
-#     instructions="""
-#     You are a weather assistant using Azure AI Foundry models. You can provide
-#     current weather information and forecasts for any location. Always be helpful
-#     and provide detailed weather information when asked.
-#     """,
-#     tools=[get_weather, get_forecast],
-# )
-
-# agent = await _foundry_setup()
+    credential = AzureCliCredential()
+    client = FoundryChatClient(credential=credential)
+    
+    agent = Agent(
+        client=client,
+        name="FoundryWeatherAgent",
+        instructions="""You are a weather assistant using Azure AI Foundry models. You can provide
+current weather information and forecasts for any location. Always be helpful
+and provide detailed weather information when asked.""",
+        tools=[get_weather, get_forecast],
+    )
+    
+    return agent
 
 
 def main():
@@ -101,7 +72,6 @@ def main():
     logger.info("Starting Foundry Weather Agent")
     logger.info("Available at: http://localhost:8090")
     logger.info("Entity ID: agent_FoundryWeatherAgent")
-    logger.info("Note: Make sure 'az login' has been run for authentication")
 
     # Setup agent synchronously
     agent = asyncio.run(_foundry_setup())

@@ -1,15 +1,16 @@
-﻿using Azure.AI.Projects;
-using Azure.AI.Projects.OpenAI;
+﻿using System.ClientModel;
+using Azure.AI.Projects;
+using Azure.AI.Projects.Agents;
 using Azure.Identity;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI.Foundry;
 using DotNetEnv;
 
 
 Env.Load("../../../../.env");
 
-var endpoint = Environment.GetEnvironmentVariable("AZURE_AI_PROJECT_ENDPOINT") ?? throw new InvalidOperationException("AZURE_AI_PROJECT_ENDPOINT is not set.");
-var deploymentName = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-4o-mini";
+var endpoint = Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT") ?? throw new InvalidOperationException("FOUNDRY_PROJECT_ENDPOINT is not set.");
+var deploymentName = Environment.GetEnvironmentVariable("FOUNDRY_MODEL") ?? "gpt-4o-mini";
 
 // Create an AI Project client and get an OpenAI client that works with the foundry service.
 AIProjectClient aiProjectClient = new(
@@ -17,15 +18,17 @@ AIProjectClient aiProjectClient = new(
     new AzureCliCredential());
 
 
-AIAgent agent = await aiProjectClient.CreateAIAgentAsync(
-    name: "Agent-Framework",
-    creationOptions: new AgentVersionCreationOptions(
-        new PromptAgentDefinition(model: deploymentName)
+ProjectsAgentVersion agentVersion = await aiProjectClient.AgentAdministrationClient.CreateAgentVersionAsync(
+    "Agent-Framework",
+    new ProjectsAgentVersionCreationOptions(
+        new DeclarativeAgentDefinition(model: deploymentName)
         {
             Instructions = "You are good at telling jokes."
-        })
-);
+        }));
 
+#pragma warning disable OPENAI001
+FoundryAgent agent = aiProjectClient.AsAIAgent(agentVersion);
+#pragma warning restore OPENAI001
 
 Console.WriteLine(await agent.RunAsync("Write a haiku about Agent Framework"));
 

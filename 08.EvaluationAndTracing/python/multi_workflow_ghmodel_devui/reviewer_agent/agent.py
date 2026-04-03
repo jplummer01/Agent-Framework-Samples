@@ -1,15 +1,15 @@
 import os 
 
-from agent_framework.openai import OpenAIChatClient  
+from agent_framework.openai import OpenAIChatCompletionClient  
 from dotenv import load_dotenv # 📁 Secure configuration loading
 
 load_dotenv()  # 📁 Load environment variables from .env file
 
 
-chat_client = OpenAIChatClient(
+openai_chat_client = OpenAIChatCompletionClient(
     base_url=os.environ.get("GITHUB_ENDPOINT"),    # 🌐 GitHub Models API endpoint
     api_key=os.environ.get("GITHUB_TOKEN"),        # 🔑 Authentication token
-    model_id=os.environ.get("GITHUB_MODEL_ID")     # 🎯 Selected AI model
+    model=os.environ.get("GITHUB_MODEL_ID")        # 🎯 Selected AI model
 )
 
 REVIEWER_NAME = "Concierge"
@@ -22,9 +22,7 @@ REVIEWER_INSTRUCTIONS = """
 
 
 
-reviewer_agent = chat_client.as_agent(
-        instructions=(
-            REVIEWER_INSTRUCTIONS
-        ),
-        name=REVIEWER_NAME,
+reviewer_agent = openai_chat_client.as_agent(
+    instructions=REVIEWER_INSTRUCTIONS,
+    name=REVIEWER_NAME,
 )

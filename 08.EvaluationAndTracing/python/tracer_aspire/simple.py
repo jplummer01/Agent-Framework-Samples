@@ -4,30 +4,24 @@ from random import randint
 from typing import Annotated
 
 import dotenv
-from agent_framework import ChatAgent
-from agent_framework.azure import AzureAIAgentClient
-from agent_framework.observability import get_tracer
-from azure.ai.projects.aio import AIProjectClient
+from agent_framework import Agent
+from agent_framework.foundry import FoundryChatClient
+from agent_framework.observability import configure_otel_providers, get_tracer
 from azure.identity.aio import AzureCliCredential
 from opentelemetry.trace import SpanKind
 from opentelemetry.trace.span import format_trace_id
 
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from agent_framework.observability import setup_observability
-
 from pydantic import Field
 
 """
-This sample shows you can can setup telemetry for an Azure AI agent.
-It uses the Azure AI client to setup the telemetry, this calls out to
-Azure AI for the connection string of the attached Application Insights
-instance.
+This sample shows you can setup telemetry for an Azure AI Foundry agent.
+It uses observability to send telemetry data to an OTLP endpoint (Aspire Dashboard).
 
-You must add an Application Insights instance to your Azure AI project
-for this sample to work.
+You must configure the OTEL_EXPORTER_OTLP_ENDPOINT environment variable to point to your
+telemetry collector (e.g., Aspire Dashboard at http://localhost:4317).
 """
 
-# For loading the `AZURE_AI_PROJECT_ENDPOINT` environment variable
+# For loading the `FOUNDRY_PROJECT_ENDPOINT` and `OTEL_EXPORTER_OTLP_ENDPOINT` environment variables
 dotenv.load_dotenv()
 
 
@@ -41,38 +35,32 @@ async def get_weather(
 
 
 async def main():
-    async with (
-        AzureCliCredential() as credential,
-        AIProjectClient(endpoint=os.environ["AZURE_AI_PROJECT_ENDPOINT"], credential=credential) as project,
-        AzureAIAgentClient(project_client=project) as client,
-    ):
-        # This will enable tracing and configure the application to send telemetry data to the
-        # Application Insights instance attached to the Azure AI project.
-        # This will override any existing configuration.
-        exporter = OTLPSpanExporter(endpoint=os.environ["OTLP_ENDPOINT"])
-        setup_observability(exporters=[exporter])
+    # This will enable tracing and configure the application to send telemetry data to the
+    # OTLP endpoint (e.g., Aspire Dashboard) based on environment variables.
+    # Reads OTEL_EXPORTER_OTLP_ENDPOINT and other standard OpenTelemetry env vars.
+    configure_otel_providers()
+    
+    async with AzureCliCredential() as credential:
+        # Create FoundryChatClient
+        client = FoundryChatClient(credential=credential)
 
         questions = ["What's the weather in Amsterdam?", "and in Paris, and which is better?", "Why is the sky blue?"]
 
         with get_tracer().start_as_current_span("Single Agent Chat", kind=SpanKind.CLIENT) as current_span:
             print(f"Trace ID: {format_trace_id(current_span.get_span_context().trace_id)}")
 
-            agent = ChatAgent(
-                chat_client=client,
+            agent = Agent(
+                client=client,
                 tools=get_weather,
                 name="WeatherAgent",
                 instructions="You are a weather assistant.",
             )
-            thread = agent.get_new_thread()
+            
             for question in questions:
                 print(f"User: {question}")
-                print(f"{agent.display_name}: ", end="")
-                async for update in agent.run_stream(
-                    question,
-                    thread=thread,
-                ):
-                    if update.text:
-                        print(update.text, end="")
+                print(f"Agent: ", end="")
+                response = await agent.run(question)
+                print(response.text)
 
 
 if __name__ == "__main__":

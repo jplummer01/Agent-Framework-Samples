@@ -7,6 +7,7 @@ from azure.identity.aio import AzureCliCredential
 from dotenv import load_dotenv
 
 from agent_framework import (
+    Agent,
     AgentExecutor,
     AgentExecutorRequest,
     AgentExecutorResponse,
@@ -15,7 +16,7 @@ from agent_framework import (
     WorkflowContext,
     executor,
 )
-from agent_framework.azure import AzureAIAgentClient, AzureAIAgentsProvider
+from agent_framework.foundry import FoundryChatClient
 
 from evangelist_agent import EVANGELIST_NAME, EVANGELIST_INSTRUCTIONS
 from contentreview_agent import ReviewAgent, REVIEWER_NAME, REVIEWER_INSTRUCTIONS
@@ -82,7 +83,7 @@ async def handle_review(review: ReviewResult, ctx: WorkflowContext[str]) -> None
     else:
         await ctx.send_message(
             AgentExecutorRequest(
-                messages=[Message("user", text=review.draft_content)], 
+                messages=[Message("user", contents=review.draft_content)], 
                 should_respond=True
             )
         )
@@ -94,67 +95,57 @@ async def save_draft(review: ReviewResult, ctx: WorkflowContext[AgentExecutorReq
     # Only called for approved drafts by selection_func
     await ctx.send_message(
         AgentExecutorRequest(
-            messages=[Message("user", text=review.draft_content)], 
+            messages=[Message("user", contents=review.draft_content)], 
             should_respond=True
         )
     )
 
 
-# Keep provider/credential alive — they must not be closed while DevUI serves.
+# Keep credential and client alive — they must not be closed while DevUI serves.
 # main.py runs create_workflow() and uvicorn in a single asyncio.run(),
 # so the references here keep the HTTP sessions alive for the entire process.
 _credential = None
-_provider = None
 _client = None
 
 
 async def create_workflow():
     """Create the conditional workflow with Azure AI Foundry agents.
 
-    The credential, provider, and client are stored as module globals so they
+    The credential and client are stored as module globals so they
     remain alive for the duration of the process. main.py ensures that
     create_workflow() and uvicorn run in the same event loop.
     """
-    global _credential, _provider, _client
+    global _credential, _client
 
     _credential = AzureCliCredential()
-    _provider = AzureAIAgentsProvider(credential=_credential)
-    _client = AzureAIAgentClient(credential=_credential)
-    code_interpreter_tool = _client.get_code_interpreter_tool()
+    _client = FoundryChatClient(credential=_credential)
 
-    # Create evangelist agent with Bing Search
-    evangelist_agent_obj = await _provider.create_agent(
+    # Create web search tool and code interpreter tool
+    web_search_tool = FoundryChatClient.get_web_search_tool()
+    code_interpreter_tool = FoundryChatClient.get_code_interpreter_tool()
+
+    # Create evangelist agent with web search tool
+    evangelist_agent_obj = Agent(
+        client=_client,
         name=EVANGELIST_NAME,
         instructions=EVANGELIST_INSTRUCTIONS,
-        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-        tools=[
-            {
-                "type": "bing_grounding",
-                "bing_grounding": {
-                    "search_configurations": [
-                        {
-                            "connection_id": os.environ["BING_CONNECTION_ID"],
-                        }
-                    ]
-                },
-            }
-        ],
+        tools=[web_search_tool],
     )
     evangelist_executor = AgentExecutor(evangelist_agent_obj, id="evangelist_agent")
     
-    # Create reviewer agent
-    reviewer_agent_obj = await _provider.create_agent(
+    # Create reviewer agent (no tools needed)
+    reviewer_agent_obj = Agent(
+        client=_client,
         name=REVIEWER_NAME,
         instructions=REVIEWER_INSTRUCTIONS,
-        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
     )
     reviewer_executor = AgentExecutor(reviewer_agent_obj, id="reviewer_agent")
     
-    # Create publisher agent with Code Interpreter
-    publisher_agent_obj = await _provider.create_agent(
+    # Create publisher agent with code interpreter tool
+    publisher_agent_obj = Agent(
+        client=_client,
         name=PUBLISHER_NAME,
         instructions=PUBLISHER_INSTRUCTIONS,
-        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
         tools=[code_interpreter_tool],
     )
     publisher_executor = AgentExecutor(publisher_agent_obj, id="publisher_agent")

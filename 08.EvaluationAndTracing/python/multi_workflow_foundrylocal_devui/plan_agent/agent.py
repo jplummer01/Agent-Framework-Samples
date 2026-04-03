@@ -11,28 +11,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 try:
-	from agent_framework.openai import OpenAIChatClient  # type: ignore
+	from agent_framework_foundry_local import FoundryLocalClient  # type: ignore
 except ImportError:  # pragma: no cover
-	raise SystemExit("agent_framework package not found. Install project dependencies first.")
+	raise SystemExit("agent_framework_foundry_local package not found. Install project dependencies first.")
 
 PLAN_AGENT_NAME = "Plan-Agent"
 PLAN_AGENT_INSTRUCTIONS = """
 You are my planner, working with me to create 1 sample based on the researcher's findings.
 """
 
-def _build_client() -> OpenAIChatClient:
-	base_url = os.environ.get("FOUNDRYLOCAL_ENDPOINT")
-	model_id = os.environ.get("FOUNDRYLOCAL_MODEL_DEPLOYMENT_NAME") 
-	api_key = "nokey"
-	if not base_url:
-		raise RuntimeError("No model endpoint configured. Set FOUNDRYLOCAL_ENDPOINT or GITHUB_ENDPOINT.")
-	return OpenAIChatClient(base_url=base_url, api_key=api_key, model_id=model_id)
-
 try:
-	_client = _build_client()
-	plan_agent = _client.as_agent(
-		instructions=PLAN_AGENT_INSTRUCTIONS,
+	model_id = os.environ.get("FOUNDRYLOCAL_MODEL", "qwen2.5-1.5b-instruct-generic-cpu:4")
+	client = FoundryLocalClient(model=model_id)
+	plan_agent = client.as_agent(
 		name=PLAN_AGENT_NAME,
+		instructions=PLAN_AGENT_INSTRUCTIONS,
 	)
 except Exception as e:  # pragma: no cover
 	print(f"[plan_agent] initialization warning: {e}")

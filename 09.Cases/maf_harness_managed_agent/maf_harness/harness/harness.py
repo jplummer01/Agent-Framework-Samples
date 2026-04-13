@@ -58,7 +58,7 @@ def make_foundry_client(model: str | None = None) -> FoundryChatClient:
       1. FOUNDRY_API_KEY env var  → AzureKeyCredential (dev / CI)
       2. DefaultAzureCredential   → az login / Managed Identity (production)
 
-    通过环境变量配置（如未显式传递）：
+    Configured via environment variables (if not explicitly passed):
       FOUNDRY_PROJECT_ENDPOINT
       FOUNDRY_MODEL
     """
@@ -278,10 +278,10 @@ class AgentHarness:
             base += f"\n\nMost recent session events:\n{summary}\n"
         return base
 
-    # ── 运行 ───────────────────────────────────────────────────────────────
+    # ── Execution ───────────────────────────────────────────────────────────────
 
     async def run(self, user_input: str) -> str:
-        """通过 Foundry 执行一次代理循环轮次。"""
+        """Execute one agent loop iteration via Foundry."""
         if self._agent is None or self._session_id is None:
             raise RuntimeError("Harness not started. Call start(session_id) first.")
         try:
@@ -307,7 +307,7 @@ class AgentHarness:
             raise
 
     async def run_streaming(self, user_input: str):
-        """逐步返回从 Foundry 到达的响应文本块。"""
+        """Yield response text chunks as they arrive from Foundry."""
         if self._agent is None:
             raise RuntimeError("Harness not started.")
         async for chunk in self._agent.run(user_input, stream=True):

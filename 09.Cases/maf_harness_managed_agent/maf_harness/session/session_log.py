@@ -77,7 +77,7 @@ class SessionLog:
         self._history:  dict[str, InMemoryHistoryProvider]    = {}
         self._lock = asyncio.Lock()
 
-    # ── 生命周期 ─────────────────────────────────────────────────────────────
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def create_session(
         self,

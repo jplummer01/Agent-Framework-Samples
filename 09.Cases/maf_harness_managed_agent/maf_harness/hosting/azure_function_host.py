@@ -71,7 +71,7 @@ def _get_client():
     return _foundry_client
 
 
-# ── 处理逻辑（Azure Functions 和 FastAPI 共用）────────────────────────────
+# ── Handler Logic (shared by Azure Functions and FastAPI) ────────────────────────────
 
 async def _handle_create_session(body: dict) -> dict:
     task       = body.get("task", "")
@@ -126,7 +126,7 @@ async def _handle_wake(session_id: str) -> dict:
     }
 
 
-# ── Azure Functions HTTP 触发器 ─────────────────────────────────────────────
+# ── Azure Functions HTTP Triggers ─────────────────────────────────────────────
 
 if _AZURE:
     app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)

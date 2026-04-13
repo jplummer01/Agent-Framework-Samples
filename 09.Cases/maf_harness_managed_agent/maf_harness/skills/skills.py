@@ -22,7 +22,7 @@ def _dedent(text: str) -> str:
     return textwrap.dedent(text).strip()
 
 
-# ── 技能定义 ─────────────────────────────────────────────────────────────
+# ── Skill Definitions ─────────────────────────────────────────────────────────────
 
 def make_research_skill() -> Skill:
     return Skill(

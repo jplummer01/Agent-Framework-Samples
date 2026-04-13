@@ -1,22 +1,22 @@
 """
 maf_harness.harness.harness
 ============================
-编排器是"大脑" — 一个无状态的编排循环，由
-Microsoft Foundry（FoundryChatClient）驱动。它具有以下特性：
+The harness is the "brain" — a stateless orchestration loop,
+driven by Microsoft Foundry (FoundryChatClient). It has the following characteristics:
 
-  1. 无状态    ：所有状态都保存在会话日志中，而非编排器内。
-  2. 解耦      ：仅通过 execute(name, input) → string 调用沙箱。
-  3. 可恢复    ：wake(session_id) 从持久化日志中重新注入上下文。
-  4. Foundry   ：唯一的 LLM 后端是 FoundryChatClient — 无 OpenAI SDK。
+  1. Stateless   : All state is stored in the session log, not in the harness.
+  2. Decoupled   : Calls sandboxes only via execute(name, input) → string.
+  3. Recoverable : wake(session_id) rehydrates context from durable log.
+  4. Foundry     : The only LLM backend is FoundryChatClient — zero OpenAI SDK.
 
-必需的环境变量：
+Required environment variables:
     FOUNDRY_PROJECT_ENDPOINT   https://<hub>.services.ai.azure.com
-    FOUNDRY_MODEL              gpt-5.4（任何 Foundry 已部署的模型）
+    FOUNDRY_MODEL              gpt-5.4 (any Foundry deployed model)
 
-认证（DefaultAzureCredential 优先级顺序）：
-    1. FOUNDRY_API_KEY 环境变量  → AzureKeyCredential（开发 / CI）
-    2. az login                  → AzureCliCredential（本地开发）
-    3. Managed Identity          → 在 Azure 上自动生效（生产环境）
+Authentication (DefaultAzureCredential precedence):
+    1. FOUNDRY_API_KEY env var  → AzureKeyCredential (dev / CI)
+    2. az login                 → AzureCliCredential (local dev)
+    3. Managed Identity         → automatic on Azure (production)
 """
 
 from __future__ import annotations
@@ -48,15 +48,15 @@ from maf_harness.session.session_log import EventKind, SessionEvent, SessionLog
 from maf_harness.skills.skills import build_skills_provider
 
 
-# ── Foundry 客户端工厂 ────────────────────────────────────────────────────────
+# ── Foundry Client Factory ──────────────────────────────────────────────────
 
 def make_foundry_client(model: str | None = None) -> FoundryChatClient:
     """
-    构建 FoundryChatClient。
+    Build FoundryChatClient.
 
-    认证优先级：
-      1. FOUNDRY_API_KEY 环境变量  → AzureKeyCredential（开发 / CI）
-      2. DefaultAzureCredential    → az login / Managed Identity（生产环境）
+    Authentication priority:
+      1. FOUNDRY_API_KEY env var  → AzureKeyCredential (dev / CI)
+      2. DefaultAzureCredential   → az login / Managed Identity (production)
 
     通过环境变量配置（如未显式传递）：
       FOUNDRY_PROJECT_ENDPOINT

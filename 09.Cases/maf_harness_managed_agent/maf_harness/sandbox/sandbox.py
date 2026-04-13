@@ -1,16 +1,16 @@
 """
 maf_harness.sandbox.sandbox
 ============================
-沙箱是"双手" — 一个隔离的执行环境，编排器通过单一接口调用：
+Sandbox is the "hands" — an isolated execution environment that the harness calls via a single interface:
 
     execute(name, input) → string
     provision(resources) → sandbox_id
 
-来自 Anthropic 文章的关键设计决策：
-  - 沙箱是"可替换的"：如果一个挂了，编排器会创建一个新的。
-  - 凭据永远不进入沙箱；它们保存在 VaultStore 中。
-  - 沙箱按需创建（而非预先创建） — 这使 Anthropic 的
-    p50 TTFT 减少了约 60%，p95 减少了超过 90%。
+Key design decisions from the Anthropic article:
+  - Sandboxes are "cattle": if one dies, the harness creates a new one.
+  - Credentials never enter the sandbox; they are kept in VaultStore.
+  - Sandboxes are created on-demand (not pre-provisioned) — this reduced Anthropic's
+    p50 TTFT by ~60% and p95 by >90%.
 """
 
 from __future__ import annotations
@@ -22,12 +22,12 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
-# ── 凭据保险库 ──────────────────────────────────────────────────────────────
+# ── Credential Vault ────────────────────────────────────────────────────────
 
 class VaultStore:
     """
-    安全凭据存储 — 令牌永远不进入沙箱。
-    生产环境中使用 Azure Key Vault 作为后端。
+    Secure credential storage — tokens never enter the sandbox.
+    Use Azure Key Vault as backend in production.
     """
 
     def __init__(self) -> None:
@@ -43,7 +43,7 @@ class VaultStore:
         self._vault.pop(key, None)
 
 
-# ── 沙箱资源规格 ─────────────────────────────────────────────────────────────
+# ── Sandbox Resource Spec ─────────────────────────────────────────────────────────
 
 @dataclass
 class SandboxResources:
@@ -54,10 +54,10 @@ class SandboxResources:
     allowed_tools: list[str]  = field(default_factory=list)
 
 
-# ── 工具注册表 ─────────────────────────────────────────────────────────────
+# ── Tool Registry ───────────────────────────────────────────────────────────
 
 class ToolRegistry:
-    """沙箱内可用的命名可调用工具的注册表。"""
+    """Registry of named callable tools available within the sandbox."""
 
     def __init__(self) -> None:
         self._tools: dict[str, Callable] = {}
@@ -72,12 +72,12 @@ class ToolRegistry:
         return list(self._tools.keys())
 
 
-# ── 沙箱实例 ──────────────────────────────────────────────────────────────
+# ── Sandbox Instance ────────────────────────────────────────────────────────
 
 class Sandbox:
     """
-    单个沙箱实例。除活跃标志外无状态。
-    标准接口：await sandbox.execute(name, input) → str
+    A single sandbox instance. Stateless except for alive flag.
+    Standard interface: await sandbox.execute(name, input) → str
     """
 
     def __init__(

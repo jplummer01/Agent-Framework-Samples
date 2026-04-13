@@ -155,9 +155,9 @@ GLOBAL_METRICS = Metrics()
 
 def make_observability_middleware(metrics: Metrics | None = None):
     """
-    测量每次代理运行的首 token 延迟（TTFT）。
-    Anthropic 通过将大脑与沙箱解耦，使 p50 TTFT 减少约 60%，p95 减少超过 90%。
-    此中间件为您的部署跟踪该数值。
+    Measure time-to-first-token (TTFT) latency on every agent run.
+    Anthropic reduced p50 TTFT by ~60% and p95 by >90% by decoupling brain from sandbox.
+    This middleware tracks that metric for your deployment.
     """
     m = metrics or GLOBAL_METRICS
 

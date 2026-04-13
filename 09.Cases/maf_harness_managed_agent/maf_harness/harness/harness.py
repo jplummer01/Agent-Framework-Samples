@@ -80,15 +80,15 @@ def make_foundry_client(model: str | None = None) -> FoundryChatClient:
     )
 
 
-# ── 编排器配置 ─────────────────────────────────────────────────────────────
+# ── Harness Configuration ───────────────────────────────────────────────────────
 
 @dataclass
 class HarnessConfig:
-    """每个编排器的配置。"""
+    """Configuration per harness."""
     agent_name:          str       = "ManagedAgent"
-    model:               str       = ""          # 回退到 FOUNDRY_MODEL 环境变量
+    model:               str       = ""          # Falls back to FOUNDRY_MODEL env var
     max_iterations:      int       = 20
-    context_window_size: int       = 30          # wake() 时重新加载的事件数
+    context_window_size: int       = 30          # Events reloaded on wake()
     skill_names:         list[str] = field(default_factory=lambda: [
                                         "research", "code_execution",
                                         "summarise", "orchestration",
@@ -149,57 +149,57 @@ def build_sandbox_tools(
                     return f"[SANDBOX FAILED after retry] {exc}"
         return "[SANDBOX FAILED]"
 
-    # ── 带类型的 AF 工具函数 ───────────────────────────────────────────────
+    # ── Typed AF Tool Functions ───────────────────────────────────────────────
 
     async def run_python(
-        code: Annotated[str, Field(description="在隔离沙箱中执行的 Python 代码。")],
+        code: Annotated[str, Field(description="Python code to execute in isolated sandbox.")],
     ) -> str:
-        """在沙箱中执行 Python 代码并返回标准输出。"""
+        """Execute Python code in sandbox and return stdout."""
         return await _exec("run_python", code)
 
     async def web_search(
-        query: Annotated[str, Field(description="要在网上搜索的查询内容。")],
+        query: Annotated[str, Field(description="Query to search on the web.")],
     ) -> str:
-        """搜索网络并返回摘要结果。"""
+        """Search the web and return summarized results."""
         return await _exec("web_search", query)
 
     async def write_file(
-        path:    Annotated[str, Field(description="目标文件路径。")],
-        content: Annotated[str, Field(description="要写入的内容。")],
+        path:    Annotated[str, Field(description="Target file path.")],
+        content: Annotated[str, Field(description="Content to write.")],
     ) -> str:
-        """将内容写入沙箱文件系统中的文件。"""
+        """Write content to a file in sandbox filesystem."""
         return await _exec("write_file", f"{path}::{content}")
 
     async def read_file(
-        path: Annotated[str, Field(description="要读取的文件路径。")],
+        path: Annotated[str, Field(description="File path to read.")],
     ) -> str:
-        """从沙箱文件系统中读取文件。"""
+        """Read a file from sandbox filesystem."""
         return await _exec("read_file", path)
 
     async def get_session_context(
-        last_n: Annotated[int, Field(description="要检索的最近事件数量。")] = 10,
+        last_n: Annotated[int, Field(description="Number of recent events to retrieve.")] = 10,
     ) -> str:
-        """从会话日志中检索最近事件作为上下文。"""
+        """Retrieve recent events from session log for context."""
         events = await session_log.get_context_window(session_id, last_n=last_n)
         return "\n".join(f"[{e.kind.value}] {e.payload}" for e in events) or "(no events)"
 
     return [run_python, web_search, write_file, read_file, get_session_context]
 
 
-# ── 代理编排器 — 大脑 ─────────────────────────────────────────────────────
+# ── Agent Harness — Brain ─────────────────────────────────────────────────────
 
 class AgentHarness:
     """
-    由 Microsoft Foundry 驱动的无状态编排器。
+    Stateless harness driven by Microsoft Foundry.
 
-    生命周期：
-        harness = AgentHarness(session_log, sandbox_mgr, config)
-        await harness.start(session_id)        # 若会话已存在则执行 wake()
-        response = await harness.run(message)  # 一次代理循环轮次
+    Lifecycle:
+        harness = AgentHarness(...)
+        await harness.start(session_id)        # wake() if session exists
+        response = await harness.run(message)  # one agent loop turn
         await harness.shutdown()
 
-    崩溃时：创建新的编排器，调用 start(同一个 session_id)。
-    wake() 会重新注入完整的事件历史 — 无数据丢失。
+    On crash: create a new harness, call start(same session_id).
+    wake() rehydrates full event history — zero data loss.
     """
 
     def __init__(
@@ -212,17 +212,17 @@ class AgentHarness:
         self.session_log = session_log
         self.sandbox_mgr = sandbox_mgr
         self.config      = config or HarnessConfig()
-        self._client     = client   # 注入预构建的客户端（测试 / 复用）
+        self._client     = client   # Inject pre-built client (testing / reuse)
         self._agent:           Agent | None                 = None
         self._session_id:      str | None                   = None
         self._history_provider: InMemoryHistoryProvider | None = None
 
-    # ── 启动 / 唤醒 ──────────────────────────────────────────────────────────
+    # ── Start / Wake ──────────────────────────────────────────────────────────────
 
     async def start(self, session_id: str) -> None:
         """
-        附加到一个会话。如果会话已有事件，则执行
-        wake() — 编排器从持久化日志中重建上下文，不丢失任何历史记录。
+        Attach to a session. If session has existing events, perform
+        wake() — harness rebuilds context from durable log without losing any history.
         """
         self._session_id = session_id
 
@@ -315,7 +315,7 @@ class AgentHarness:
                 yield chunk.text
 
     async def shutdown(self) -> None:
-        """向持久化日志发出 SESSION_END 事件。"""
+        """Emit SESSION_END event to durable log."""
         if self._session_id:
             await self.session_log.emit_event(
                 self._session_id,

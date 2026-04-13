@@ -2,20 +2,8 @@
 
 > Anthropic proposed a core thesis in [Scaling Managed Agents: Decoupling the brain from the hands](https://www.anthropic.com/engineering/managed-agents): **the reliability of an Agent system depends on the degree of decoupling between components, not on the complexity of any single component**. This article implements that architectural theory end-to-end on the **Microsoft Agent Framework (MAF) + Azure AI Foundry** stack, validating every design decision with runnable code.
 
-**Content Structure**
 
-| Section | Topic | Corresponding Anthropic Concept |
-|---------|-------|---------------------------------|
-| 1 | Failure Mode Analysis of Monolithic Agents | "Don't adopt a pet" |
-| 2 | Three-Layer Decoupled Architecture Overview | Session / Harness / Sandbox |
-| 3 | Session: Durable Event Log | `emitEvent` · `getEvents` · `wake` |
-| 4 | Sandbox: Disposable Execution Environment | `execute(name, input) → string` |
-| 5 | Harness: Stateless Orchestrator | Crash recovery · `wake(sessionId)` |
-| 6 | MAF-Native Extensions: Skill · Middleware · Foundry | Beyond the three layers |
-| 7 | Many Brains, Many Hands: Parallel Orchestration | "Many brains, many hands" |
-| 8 | Lazy Sandbox Provisioning and TTFT Optimization | p50 ↓60%, p95 ↓90% |
-| 9 | Azure Functions Stateless Hosting | Serverless deployment |
-| 10 | Interface Stability from Dev to Production | "Opinionated about interfaces" |
+![logo](./imgs/logo.png)
 
 ---
 

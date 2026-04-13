@@ -2,20 +2,7 @@
 
 > Anthropic 在 [Scaling Managed Agents: Decoupling the brain from the hands](https://www.anthropic.com/engineering/managed-agents) 中提出了一个核心命题：**Agent 系统的可靠性取决于组件之间的解耦程度，而非单一组件的复杂度**。本文将这套架构理论完整落地到 **Microsoft Agent Framework（MAF）+ Azure AI Foundry** 技术栈上，并通过可运行的代码验证每一个设计决策。
 
-**内容结构**
-
-| 章节 | 主题 | 对应 Anthropic 概念 |
-|------|------|---------------------|
-| 一 | 单体 Agent 的失败模式分析 | "Don't adopt a pet" |
-| 二 | 三层解耦架构全景 | Session / Harness / Sandbox |
-| 三 | Session：持久化事件日志 | `emitEvent` · `getEvents` · `wake` |
-| 四 | Sandbox：可替换的执行环境 | `execute(name, input) → string` |
-| 五 | Harness：无状态编排器 | 崩溃恢复 · `wake(sessionId)` |
-| 六 | MAF 原生扩展：Skill · Middleware · Foundry | 超越三层的工程实践 |
-| 七 | 多大脑多双手：并行编排 | "Many brains, many hands" |
-| 八 | 延迟沙箱创建与 TTFT 优化 | p50 ↓60%、p95 ↓90% |
-| 九 | Azure Functions 无状态托管 | Serverless 部署 |
-| 十 | 开发到生产的接口稳定性 | "Opinionated about interfaces" |
+![logo](./imgs/logo.png)
 
 ---
 

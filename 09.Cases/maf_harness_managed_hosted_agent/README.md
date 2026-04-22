@@ -215,7 +215,7 @@ Expect a sequence like `session_start → tool_call(execute) → tool_result →
 Build for `linux/amd64` and deploy with the Foundry CLI the same way as the upstream sample:
 
 ```bash
-docker build --platform=linux/amd64 -t managed-style-agent .
+azd up
 ```
 
 Then follow the hosted-agent deployment flow: <https://learn.microsoft.com/en-us/azure/ai-foundry/agents/concepts/hosted-agents?view=foundry&tabs=cli>.
